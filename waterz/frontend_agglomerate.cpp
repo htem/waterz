@@ -23,7 +23,8 @@ initialize(
 		const GtID*     ground_truth_data,
 		AffValue        affThresholdLow,
 		AffValue        affThresholdHigh,
-		bool            findFragments) {
+		bool            findFragments,
+		UnmergeGroupListTupleList* unmergeList) {
 
 	std::size_t num_voxels = width*height*depth;
 
@@ -45,13 +46,9 @@ initialize(
 
 	if (findFragments) {
 
-		std::cout << "performing initial watershed segmentation..." << std::endl;
-
 		watershed(affinities, affThresholdLow, affThresholdHigh, *segmentation, sizes);
 
 	} else {
-
-		std::cout << "counting regions and sizes..." << std::endl;
 
 		std::size_t maxId = *std::max_element(segmentation_data, segmentation_data + num_voxels);
 		sizes.resize(maxId + 1);
@@ -60,18 +57,14 @@ initialize(
 	}
 
 	std::size_t numNodes = sizes.size();
-	std::cout << "creating region graph for " << numNodes << " nodes" << std::endl;
 
 	std::shared_ptr<RegionGraphType> regionGraph(
 			new RegionGraphType(numNodes)
 	);
 
-	std::cout << "creating statistics provider" << std::endl;
 	std::shared_ptr<StatisticsProviderType> statisticsProvider(
 			new StatisticsProviderType(*regionGraph)
 	);
-
-	std::cout << "extracting region graph..." << std::endl;
 
 	get_region_graph(
 			affinities,
@@ -111,6 +104,8 @@ initialize(
 		context->groundtruth = groundtruth;
 	}
 
+	context->unmergeList = *unmergeList;
+
 	return initial_state;
 }
 
@@ -125,6 +120,11 @@ mergeUntil(
 
 	std::vector<Merge>  mergeHistory;
 	MergeHistoryVisitor mergeHistoryVisitor(mergeHistory);
+
+	if (context->unmergeList.size()) {
+		UnmergeTracker* unmergeTracker = new UnmergeTracker(context->unmergeList);
+		mergeHistoryVisitor.setUnmergeTracker(unmergeTracker);
+	}
 
 	std::size_t merged = context->regionMerging->mergeUntil(
 			*context->scoringFunction,
@@ -151,6 +151,8 @@ mergeUntil(
 		state.metrics.voi_merge  = std::get<3>(m);
 	}
 
+	// TODO: make unmergeTracker a shared pointer
+	// delete unmergeTracker;
 	return mergeHistory;
 }
 

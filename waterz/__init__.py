@@ -1,5 +1,4 @@
 from __future__ import absolute_import
-from .evaluate import evaluate
 
 __version__ = '0.8'
 
@@ -14,6 +13,7 @@ def agglomerate(
         return_region_graph = False,
         scoring_function = 'OneMinus<MeanAffinity<RegionGraphType, ScoreValue>>',
         discretize_queue = 0,
+        unmerge_group_list_tuple_list=None,
         force_rebuild = False):
     '''
     Compute segmentations from an affinity graph for several thresholds.
@@ -174,7 +174,7 @@ def agglomerate(
 
     # make sure the same module is not build concurrently
     with open(os.path.join(lib_dir, module_name + '.lock'), 'w') as lock_file:
-        fcntl.lockf(lock_file, fcntl.LOCK_EX)
+        #fcntl.lockf(lock_file, fcntl.LOCK_EX)
 
         try:
 
@@ -191,8 +191,8 @@ def agglomerate(
 
             print("Compiling waterz in " + str(lib_dir))
 
-            cython_include_dirs = ['.']
-            ctx = Context(cython_include_dirs, default_options)
+            # cython_include_dirs = ['.']
+            # ctx = Context(cython_include_dirs, default_options)
 
             include_dir = os.path.join(lib_dir, module_name)
             if not os.path.exists(include_dir):
@@ -259,4 +259,5 @@ def agglomerate(
         aff_threshold_low,
         aff_threshold_high,
         return_merge_history,
-        return_region_graph)
+        return_region_graph,
+        unmerge_group_list_tuple_list=unmerge_group_list_tuple_list)

@@ -100,6 +100,10 @@ public:
 				continue;
 			}
 
+			if (!visitor.isValidMerge(_regionGraph.edge(next).u, _regionGraph.edge(next).v)) {
+				continue;
+			}
+
 			NodeIdType newRegion = mergeRegions(next, statisticsProvider);
 			merged++;
 

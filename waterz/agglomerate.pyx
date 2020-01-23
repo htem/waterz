@@ -12,7 +12,8 @@ def agglomerate(
         aff_threshold_low=0.0001,
         aff_threshold_high=0.9999,
         return_merge_history=False,
-        return_region_graph=False):
+        return_region_graph=False,
+        unmerge_group_list_tuple_list=None):
 
     # the C++ part assumes contiguous memory, make sure we have it (and do 
     # nothing, if we do)
@@ -36,7 +37,9 @@ def agglomerate(
         segmentation = fragments
         find_fragments = False
 
-    cdef WaterzState state = __initialize(affs, segmentation, gt, aff_threshold_low, aff_threshold_high, find_fragments)
+    cdef WaterzState state = __initialize(
+        affs, segmentation, gt, aff_threshold_low, aff_threshold_high, find_fragments,
+        unmerge_group_list_tuple_list)
 
     thresholds.sort()
     for threshold in thresholds:
@@ -76,7 +79,34 @@ def __initialize(
         np.ndarray[uint32_t, ndim=3]     gt = None,
         aff_threshold_low  = 0.0001,
         aff_threshold_high = 0.9999,
-        find_fragments = True):
+        find_fragments = True,
+        unmerge_group_list_tuple_list = None):
+
+    # converting unmerge_group_list_tuple_list to C++ type
+    # vectors declared here because we can't put them in
+    # the python for loop
+    cdef vector[vector[vector[uint64_t]]] c_unmerge_group_list
+    cdef vector[vector[uint64_t]] c_tuple_list
+    cdef vector[uint64_t] c_list
+
+    if unmerge_group_list_tuple_list is not None:
+        # sanity check
+        assert len(unmerge_group_list_tuple_list)
+        for tuple_list in unmerge_group_list_tuple_list:
+            assert len(tuple_list)
+            for python_list in tuple_list:
+                assert len(python_list) >= 1
+                for e in python_list:
+                    assert e != 0
+        # convert to C++ vector
+        for tuple_list in unmerge_group_list_tuple_list:
+            for python_list in tuple_list:
+                for e in python_list:
+                    c_list.push_back(e)
+                c_tuple_list.push_back(c_list)
+                c_list.clear()
+            c_unmerge_group_list.push_back(c_tuple_list)
+            c_tuple_list.clear()
 
     cdef float*    aff_data
     cdef uint64_t* segmentation_data
@@ -94,7 +124,8 @@ def __initialize(
         gt_data,
         aff_threshold_low,
         aff_threshold_high,
-        find_fragments)
+        find_fragments,
+        &c_unmerge_group_list)
 
 cdef extern from "frontend_agglomerate.h":
 
@@ -128,7 +159,10 @@ cdef extern from "frontend_agglomerate.h":
             const uint32_t* groundtruth_data,
             float           affThresholdLow,
             float           affThresholdHigh,
-            bool            findFragments);
+            bool            findFragments,
+            # TODO: use typedef
+            # UnmergeGroupListTupleList& unmerge_list);
+            vector[vector[vector[uint64_t]]]* unmerge_list);
 
     vector[Merge] mergeUntil(
             WaterzState& state,
